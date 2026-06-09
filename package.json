@@ -1,0 +1,31 @@
+{
+  "name": "pinace-backend",
+  "version": "0.1.0",
+  "description": "Pinace backend — modular Fastify REST API and background event indexer",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest --run",
+    "start": "node dist/index.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy"
+  },
+  "dependencies": {
+    "@mysten/sui": "^1.21.0",
+    "@fastify/cors": "^10.0.2",
+    "@prisma/client": "^5.14.0",
+    "fastify": "^5.3.2",
+    "pino": "^9.6.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "fast-check": "^3.23.1",
+    "prisma": "^5.14.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.3"
+  }
+}

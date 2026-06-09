@@ -1,0 +1,30 @@
+version: '3.9'
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: pinace_indexer
+      POSTGRES_USER: pinace
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: .
+    environment:
+      SUI_RPC_URL: https://fullnode.testnet.sui.io:443
+      PACKAGE_ID: 0x48fe6e060674e81288375a770fc4ad3022d2ca07ea28fb77b3d8ecfb8c115c04
+      DATABASE_URL: postgresql://pinace:secret@postgres:5432/pinace_indexer
+      POLL_INTERVAL_MS: 2000
+      BATCH_SIZE: 50
+      PORT: 3001
+      LOG_LEVEL: info
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+
+volumes:
+  pgdata:

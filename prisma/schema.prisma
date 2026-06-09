@@ -1,0 +1,122 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Pool {
+  poolId          String        @id @map("pool_id")
+  owner           String        @map("owner")
+  protocolVersion Int           @default(0) @map("protocol_version")
+  status          String        @default("active") @map("status")
+  createdAt       DateTime      @map("created_at") @db.Timestamptz
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  
+  balances        PoolBalance[]
+  agents          Agent[]
+  policies        Policy[]
+  actions         Action[]
+
+  @@index([owner], map: "idx_pools_owner")
+  @@map("pools")
+}
+
+model PoolBalance {
+  poolId    String   @map("pool_id")
+  coinType  String   @map("coin_type")
+  amount    Decimal  @default("0") @map("amount") @db.Decimal
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  pool      Pool     @relation(fields: [poolId], references: [poolId], onDelete: Cascade)
+
+  @@id([poolId, coinType])
+  @@map("pool_balances")
+}
+
+model Agent {
+  id           String    @id @default(uuid()) @map("id") @db.Uuid
+  poolId       String    @map("pool_id")
+  agentAddress String    @map("agent_address")
+  owner        String    @map("owner")
+  status       String    @default("active") @map("status")
+  expiresMs    BigInt    @default(0) @map("expires_ms")
+  connectedAt  DateTime? @map("connected_at") @db.Timestamptz
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz
+  actionCount  Int       @default(0) @map("action_count")
+  lastActiveAt DateTime? @map("last_active_at") @db.Timestamptz
+
+  pool         Pool      @relation(fields: [poolId], references: [poolId], onDelete: Cascade)
+
+  @@unique([poolId, agentAddress], map: "uq_agents_pool_agent")
+  @@index([poolId], map: "idx_agents_pool_id")
+  @@index([agentAddress], map: "idx_agents_agent_address")
+  @@map("agents")
+}
+
+model Policy {
+  id            String    @id @default(uuid()) @map("id") @db.Uuid
+  poolId        String    @map("pool_id")
+  agentAddress  String    @map("agent_address")
+  policyType    String    @map("policy_type")
+  configHash    String?   @map("config_hash")
+  marketplaceId String?   @map("marketplace_id")
+  status        String    @default("attached") @map("status")
+  attachedAt    DateTime? @map("attached_at") @db.Timestamptz
+  updatedAt     DateTime? @map("updated_at") @db.Timestamptz
+  removedAt     DateTime? @map("removed_at") @db.Timestamptz
+
+  pool          Pool      @relation(fields: [poolId], references: [poolId], onDelete: Cascade)
+
+  @@unique([poolId, agentAddress, policyType], map: "uq_policies_pool_agent_type")
+  @@map("policies")
+}
+
+model Action {
+  id               String    @id @default(uuid()) @map("id") @db.Uuid
+  poolId           String    @map("pool_id")
+  agentAddress     String    @map("agent_address")
+  nonce            BigInt    @map("nonce")
+  kind             String    @default("unknown") @map("kind")
+  amountIn         Decimal   @default("0") @map("amount_in") @db.Decimal
+  minAmountOut     Decimal   @default("0") @map("min_amount_out") @db.Decimal
+  quotedAmountOut  Decimal?  @map("quoted_amount_out") @db.Decimal
+  settlementStatus Int?      @map("settlement_status")
+  status           String    @default("proposed") @map("status")
+  proposedAt       DateTime? @map("proposed_at") @db.Timestamptz
+  settledAt        DateTime? @map("settled_at") @db.Timestamptz
+
+  pool             Pool      @relation(fields: [poolId], references: [poolId], onDelete: Cascade)
+
+  @@unique([poolId, agentAddress, nonce], map: "uq_actions_pool_agent_nonce")
+  @@index([poolId], map: "idx_actions_pool_id")
+  @@index([agentAddress], map: "idx_actions_agent_address")
+  @@map("actions")
+}
+
+model EventLog {
+  id            String   @id @default(uuid()) @map("id") @db.Uuid
+  eventType     String   @map("event_type")
+  poolId        String   @map("pool_id")
+  agentAddress  String?  @map("agent_address")
+  nonce         BigInt?  @map("nonce")
+  txDigest      String   @map("tx_digest")
+  checkpointSeq BigInt   @map("checkpoint_seq")
+  timestamp     DateTime @map("timestamp") @db.Timestamptz
+  rawPayload    Json     @map("raw_payload")
+
+  @@index([poolId], map: "idx_event_logs_pool_id")
+  @@index([agentAddress], map: "idx_event_logs_agent_address")
+  @@index([txDigest], map: "idx_event_logs_tx_digest")
+  @@map("event_logs")
+}
+
+model Checkpoint {
+  id                Int      @id @default(1)
+  lastCheckpointSeq BigInt   @map("last_checkpoint_seq")
+  updatedAt         DateTime @map("updated_at") @db.Timestamptz
+
+  @@map("checkpoints")
+}
