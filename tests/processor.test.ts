@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import fc from 'fast-check';
+import * as fc from 'fast-check';
 import { Prisma } from '@prisma/client';
-import { EventProcessor } from './index.js';
-import { IndexerRepository } from '../repository/indexer.repository.js';
-import { RawSuiEvent } from '../../shared/sui/client.js';
+import { EventProcessor } from '../src/indexer/processor/index.js';
+import { IndexerRepository } from '../src/indexer/repository/indexer.repository.js';
+import { RawSuiEvent } from '../src/shared/sui/client.js';
 
 describe('Indexer Event Ingestion & Polling Property Tests', () => {
   const PACKAGE_ID = '0x48fe6e060674e81288375a770fc4ad3022d2ca07ea28fb77b3d8ecfb8c115c04';
@@ -24,7 +24,6 @@ describe('Indexer Event Ingestion & Polling Property Tests', () => {
           })
         ),
         (events) => {
-          // Filter logic (mirroring actual filter)
           const filtered = events.filter((e) => e.packageId === PACKAGE_ID);
           
           filtered.forEach((e) => {
@@ -58,12 +57,10 @@ describe('Indexer Event Ingestion & Polling Property Tests', () => {
             if (tx.type === 'deposit') {
               currentBalance = currentBalance.plus(amount);
             } else {
-              // Simulating the GREATEST(0, balance - withdrawn) constraint
               const next = currentBalance.minus(amount);
               currentBalance = next.isNegative() ? new Prisma.Decimal(0) : next;
             }
 
-            // Assert balance is never negative
             expect(currentBalance.isNegative()).toBe(false);
           }
         }
@@ -74,7 +71,6 @@ describe('Indexer Event Ingestion & Polling Property Tests', () => {
 
   // Feature: onchain-event-indexer, Property 3: event log completeness
   it('should create exactly one event log for each processed on-chain event', () => {
-    // Generate valid mock event payloads
     const eventTypes = [
       'PoolCreatedEvent',
       'DepositEvent',
@@ -106,7 +102,6 @@ describe('Indexer Event Ingestion & Polling Property Tests', () => {
         async (rawEvents) => {
           const insertedLogs: any[] = [];
           
-          // Mock Repository
           const mockRepo = {
             upsertPool: vi.fn(),
             ensurePoolExists: vi.fn(),
@@ -131,10 +126,8 @@ describe('Indexer Event Ingestion & Polling Property Tests', () => {
 
           await processor.processBatch(rawEvents, mockTx, 1n);
 
-          // Assert count matches
           expect(insertedLogs.length).toBe(rawEvents.length);
           
-          // Verify matches fields
           for (let i = 0; i < rawEvents.length; i++) {
             expect(insertedLogs[i].txDigest).toBe(rawEvents[i].id.txDigest);
             expect(insertedLogs[i].rawPayload).toEqual(rawEvents[i].parsedJson);
@@ -186,7 +179,6 @@ describe('Indexer Event Ingestion & Polling Property Tests', () => {
               existing.settledAt = actionEvent.settledTime;
               existing.status = 'settled';
             } else {
-              // Backfill
               dbActions.push({
                 poolId: actionEvent.poolId,
                 agentAddress: actionEvent.agentAddress,
@@ -206,7 +198,6 @@ describe('Indexer Event Ingestion & Polling Property Tests', () => {
             simulateProposed();
           }
 
-          // Assert exactly one row exists
           expect(dbActions.length).toBe(1);
           
           const action = dbActions[0];
@@ -226,18 +217,14 @@ describe('Indexer Event Ingestion & Polling Property Tests', () => {
   it('should ensure checkpoint last_checkpoint_seq is monotonically increasing', () => {
     fc.assert(
       fc.property(
-        fc.bigInt({ min: 1n, max: 1000000n }), // Initial seq
-        fc.array(fc.bigInt({ min: 0n, max: 1000n })), // Steps
+        fc.bigInt({ min: 1n, max: 1000000n }),
+        fc.array(fc.bigInt({ min: 0n, max: 1000n })),
         (initial, steps) => {
           let lastCheckpointSeq = initial;
 
           for (const step of steps) {
             const nextCursorSeq = lastCheckpointSeq + step;
-            
-            // Simulating monotonicity check before update
             expect(nextCursorSeq).toBeGreaterThanOrEqual(lastCheckpointSeq);
-            
-            // Update
             lastCheckpointSeq = nextCursorSeq;
           }
         }

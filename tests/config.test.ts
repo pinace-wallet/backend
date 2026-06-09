@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import fc from 'fast-check';
-import { loadConfig } from './config.js';
+import * as fc from 'fast-check';
+import { loadConfig } from '../src/shared/config.js';
 
 describe('AppConfig Validation', () => {
   const originalEnv = { ...process.env };
@@ -37,20 +37,17 @@ describe('AppConfig Validation', () => {
           fc.integer({ min: 65536, max: 100000 })
         ),
         (badPoll, badBatch, badPort) => {
-          // Set bad environment variables
           process.env.POLL_INTERVAL_MS = String(badPoll);
           process.env.BATCH_SIZE = String(badBatch);
           process.env.PORT = String(badPort);
 
           const config = loadConfig();
 
-          // Assert fallback defaults
           expect(config.pollIntervalMs).toBe(2000);
           expect(config.batchSize).toBe(50);
           expect(config.port).toBe(3001);
           expect(spyWarn).toHaveBeenCalled();
 
-          // Reset spies/env for next iteration
           spyWarn.mockClear();
         }
       ),

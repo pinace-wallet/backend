@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import fc from 'fast-check';
-import { mapKind, mapMilestoneStatus, mapRunStatus } from './mappers.js';
+import * as fc from 'fast-check';
+import { mapKind, mapMilestoneStatus, mapRunStatus } from '../src/shared/mappers.js';
 
 describe('Shared Mappers Property Tests', () => {
   
