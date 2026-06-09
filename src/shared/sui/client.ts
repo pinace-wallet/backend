@@ -8,6 +8,7 @@ export interface RawSuiEvent {
   type: string;
   parsedJson: Record<string, any>;
   timestampMs: string;
+  checkpoint?: string;
 }
 
 export interface SuiEventPage {
@@ -56,6 +57,7 @@ export class SuiClientWrapper {
           type: e.type,
           parsedJson: e.parsedJson as Record<string, any>,
           timestampMs: e.timestampMs || String(Date.now()),
+          checkpoint: (e as any).checkpoint,
         }));
 
         const nextCursor = response.nextCursor ? JSON.stringify(response.nextCursor) : null;

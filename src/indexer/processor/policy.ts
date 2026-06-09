@@ -38,6 +38,7 @@ export async function handlePolicyAttached(
     checkpointSeq,
     timestamp: attachedAt,
     rawPayload: {
+      id: event.id,
       ...payload,
       marketplace_id: marketplaceId, // Ensure marketplace_id is in payload
     },
@@ -87,6 +88,7 @@ export async function handlePolicyUpdated(
     checkpointSeq,
     timestamp: updatedAt,
     rawPayload: {
+      id: event.id,
       ...payload,
       marketplace_id: marketplaceId,
     },
@@ -125,6 +127,6 @@ export async function handlePolicyRemoved(
     txDigest: event.id.txDigest,
     checkpointSeq,
     timestamp: removedAt,
-    rawPayload: payload,
+    rawPayload: { id: event.id, ...payload },
   });
 }

@@ -34,7 +34,7 @@ export async function handlePoolCreated(
     txDigest: event.id.txDigest,
     checkpointSeq,
     timestamp: createdAt,
-    rawPayload: payload,
+    rawPayload: { id: event.id, ...payload },
   });
 }
 
@@ -65,7 +65,7 @@ export async function handleDeposit(
     txDigest: event.id.txDigest,
     checkpointSeq,
     timestamp,
-    rawPayload: payload,
+    rawPayload: { id: event.id, ...payload },
   });
 }
 
@@ -104,6 +104,6 @@ export async function handleWithdraw(
     txDigest: event.id.txDigest,
     checkpointSeq,
     timestamp,
-    rawPayload: payload,
+    rawPayload: { id: event.id, ...payload },
   });
 }

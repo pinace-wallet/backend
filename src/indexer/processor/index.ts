@@ -22,6 +22,24 @@ export class EventProcessor {
     checkpointSeq: bigint
   ): Promise<void> {
     for (const event of events) {
+      // Idempotency check: Skip event if already processed
+      const existingLogs = await tx.eventLog.findMany({
+        where: { txDigest: event.id.txDigest },
+        select: { rawPayload: true },
+      });
+
+      const isDuplicate = existingLogs.some((log) => {
+        const payload = log.rawPayload as any;
+        return payload && payload.id && payload.id.eventSeq === event.id.eventSeq;
+      });
+
+      if (isDuplicate) {
+        console.info(
+          `[processor] Skipping already processed event: txDigest=${event.id.txDigest}, eventSeq=${event.id.eventSeq}`
+        );
+        continue;
+      }
+
       const typeName = event.type;
       
       // Dispatch based on Move event type suffix

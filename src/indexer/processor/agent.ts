@@ -35,7 +35,7 @@ export async function handleAgentConnected(
     txDigest: event.id.txDigest,
     checkpointSeq,
     timestamp: connectedAt,
-    rawPayload: payload,
+    rawPayload: { id: event.id, ...payload },
   });
 }
 
@@ -70,6 +70,6 @@ export async function handleAgentRevoked(
     txDigest: event.id.txDigest,
     checkpointSeq,
     timestamp: revokedAt,
-    rawPayload: payload,
+    rawPayload: { id: event.id, ...payload },
   });
 }

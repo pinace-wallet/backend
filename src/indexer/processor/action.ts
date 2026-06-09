@@ -48,7 +48,7 @@ export async function handleActionProposed(
     txDigest: event.id.txDigest,
     checkpointSeq,
     timestamp: proposedAt,
-    rawPayload: payload,
+    rawPayload: { id: event.id, ...payload },
   });
 }
 
@@ -121,6 +121,6 @@ export async function handleActionSettled(
     txDigest: event.id.txDigest,
     checkpointSeq,
     timestamp: settledAt,
-    rawPayload: payload,
+    rawPayload: { id: event.id, ...payload },
   });
 }

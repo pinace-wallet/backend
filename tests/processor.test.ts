@@ -122,7 +122,11 @@ describe('Indexer Event Ingestion & Polling Property Tests', () => {
           } as unknown as IndexerRepository;
 
           const processor = new EventProcessor(mockRepo);
-          const mockTx = {} as any;
+          const mockTx = {
+            eventLog: {
+              findMany: vi.fn().mockResolvedValue([]),
+            },
+          } as any;
 
           await processor.processBatch(rawEvents, mockTx, 1n);
 
@@ -130,7 +134,12 @@ describe('Indexer Event Ingestion & Polling Property Tests', () => {
           
           for (let i = 0; i < rawEvents.length; i++) {
             expect(insertedLogs[i].txDigest).toBe(rawEvents[i].id.txDigest);
-            expect(insertedLogs[i].rawPayload).toEqual(rawEvents[i].parsedJson);
+            expect(insertedLogs[i].rawPayload).toEqual(
+              expect.objectContaining({
+                id: rawEvents[i].id,
+                ...rawEvents[i].parsedJson,
+              })
+            );
           }
         }
       ),
