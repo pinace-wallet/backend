@@ -1,22 +1,20 @@
-import { TransactionClient, IndexerRepository } from '../repository/indexer.repository.js';
-import { RawSuiEvent } from '../../shared/sui/client.js';
+import type { RawSuiEvent } from '../../shared/sui/client.js';
+import type { PolicyAttachedPayload, PolicyRemovedPayload, PolicyUpdatedPayload } from '../../shared/types/events.js';
+import { bytesToHex } from '../../shared/types/events.js';
+import type { IndexerRepository, TransactionClient } from '../repository/indexer.repository.js';
 
-/**
- * Handles PolicyAttachedEvent.
- * Requirement: 4.1, 4.4
- */
 export async function handlePolicyAttached(
   event: RawSuiEvent,
   repo: IndexerRepository,
   tx: TransactionClient,
   checkpointSeq: bigint
 ): Promise<void> {
-  const payload = event.parsedJson;
-  const poolId = String(payload.pool_id);
-  const agentAddress = String(payload.agent);
-  const policyType = String(payload.policy_type);
-  const configHash = payload.config_hash ? String(payload.config_hash) : null;
-  const marketplaceId = payload.marketplace_id ? String(payload.marketplace_id) : null;
+  const payload = event.parsedJson as unknown as PolicyAttachedPayload;
+  const poolId = payload.pool_id;
+  const agentAddress = payload.agent;
+  const policyType = payload.policy_type.name;
+  const configHash = bytesToHex(payload.config_hash);
+  const marketplaceId = bytesToHex(payload.marketplace_id);
   const attachedAt = new Date(Number(event.timestampMs));
 
   await repo.upsertPolicy(tx, {
@@ -37,30 +35,22 @@ export async function handlePolicyAttached(
     txDigest: event.id.txDigest,
     checkpointSeq,
     timestamp: attachedAt,
-    rawPayload: {
-      id: event.id,
-      ...payload,
-      marketplace_id: marketplaceId, // Ensure marketplace_id is in payload
-    },
+    rawPayload: { id: event.id, ...payload },
   });
 }
 
-/**
- * Handles PolicyUpdatedEvent.
- * Requirement: 4.2, 4.4
- */
 export async function handlePolicyUpdated(
   event: RawSuiEvent,
   repo: IndexerRepository,
   tx: TransactionClient,
   checkpointSeq: bigint
 ): Promise<void> {
-  const payload = event.parsedJson;
-  const poolId = String(payload.pool_id);
-  const agentAddress = String(payload.agent);
-  const policyType = String(payload.policy_type);
-  const configHash = payload.config_hash ? String(payload.config_hash) : null;
-  const marketplaceId = payload.marketplace_id ? String(payload.marketplace_id) : null;
+  const payload = event.parsedJson as unknown as PolicyUpdatedPayload;
+  const poolId = payload.pool_id;
+  const agentAddress = payload.agent;
+  const policyType = payload.policy_type.name;
+  const configHash = bytesToHex(payload.config_hash);
+  const marketplaceId = bytesToHex(payload.marketplace_id);
   const updatedAt = new Date(Number(event.timestampMs));
 
   const found = await repo.updatePolicy(tx, {
@@ -87,28 +77,20 @@ export async function handlePolicyUpdated(
     txDigest: event.id.txDigest,
     checkpointSeq,
     timestamp: updatedAt,
-    rawPayload: {
-      id: event.id,
-      ...payload,
-      marketplace_id: marketplaceId,
-    },
+    rawPayload: { id: event.id, ...payload },
   });
 }
 
-/**
- * Handles PolicyRemovedEvent.
- * Requirement: 4.3, 4.4
- */
 export async function handlePolicyRemoved(
   event: RawSuiEvent,
   repo: IndexerRepository,
   tx: TransactionClient,
   checkpointSeq: bigint
 ): Promise<void> {
-  const payload = event.parsedJson;
-  const poolId = String(payload.pool_id);
-  const agentAddress = String(payload.agent);
-  const policyType = String(payload.policy_type);
+  const payload = event.parsedJson as unknown as PolicyRemovedPayload;
+  const poolId = payload.pool_id;
+  const agentAddress = payload.agent;
+  const policyType = payload.policy_type.name;
   const removedAt = new Date(Number(event.timestampMs));
 
   const found = await repo.removePolicy(tx, poolId, agentAddress, policyType, removedAt);

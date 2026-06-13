@@ -1,21 +1,18 @@
-import { TransactionClient, IndexerRepository } from '../repository/indexer.repository.js';
-import { RawSuiEvent } from '../../shared/sui/client.js';
+import type { RawSuiEvent } from '../../shared/sui/client.js';
+import type { AgentConnectedPayload, AgentRevokedPayload } from '../../shared/types/events.js';
+import type { IndexerRepository, TransactionClient } from '../repository/indexer.repository.js';
 
-/**
- * Handles AgentConnectedEvent.
- * Requirement: 3.1
- */
 export async function handleAgentConnected(
   event: RawSuiEvent,
   repo: IndexerRepository,
   tx: TransactionClient,
   checkpointSeq: bigint
 ): Promise<void> {
-  const payload = event.parsedJson;
-  const poolId = String(payload.pool_id);
-  const agentAddress = String(payload.agent);
-  const owner = String(payload.owner);
-  const expiresMs = BigInt(String(payload.expires_ms ?? 0));
+  const payload = event.parsedJson as unknown as AgentConnectedPayload;
+  const poolId = payload.pool_id;
+  const agentAddress = payload.agent;
+  const owner = payload.owner;
+  const expiresMs = BigInt(payload.expires_ms);
   const connectedAt = new Date(Number(event.timestampMs));
 
   await repo.upsertAgent(tx, {
@@ -39,19 +36,15 @@ export async function handleAgentConnected(
   });
 }
 
-/**
- * Handles AgentRevokedEvent.
- * Requirement: 3.2, 3.3
- */
 export async function handleAgentRevoked(
   event: RawSuiEvent,
   repo: IndexerRepository,
   tx: TransactionClient,
   checkpointSeq: bigint
 ): Promise<void> {
-  const payload = event.parsedJson;
-  const poolId = String(payload.pool_id);
-  const agentAddress = String(payload.agent);
+  const payload = event.parsedJson as unknown as AgentRevokedPayload;
+  const poolId = payload.pool_id;
+  const agentAddress = payload.agent;
   const revokedAt = new Date(Number(event.timestampMs));
 
   const found = await repo.revokeAgent(tx, poolId, agentAddress, revokedAt);

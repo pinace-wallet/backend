@@ -1,21 +1,18 @@
 import { Prisma } from '@prisma/client';
-import { TransactionClient, IndexerRepository } from '../repository/indexer.repository.js';
-import { RawSuiEvent } from '../../shared/sui/client.js';
+import type { RawSuiEvent } from '../../shared/sui/client.js';
+import type { DepositPayload, PoolCreatedPayload, WithdrawPayload } from '../../shared/types/events.js';
+import type { IndexerRepository, TransactionClient } from '../repository/indexer.repository.js';
 
-/**
- * Handles PoolCreatedEvent.
- * Requirement: 2.1, 2.5
- */
 export async function handlePoolCreated(
   event: RawSuiEvent,
   repo: IndexerRepository,
   tx: TransactionClient,
   checkpointSeq: bigint
 ): Promise<void> {
-  const payload = event.parsedJson;
-  const poolId = String(payload.pool_id);
-  const owner = String(payload.owner);
-  const version = Number(payload.version ?? 0);
+  const payload = event.parsedJson as unknown as PoolCreatedPayload;
+  const poolId = payload.pool_id;
+  const owner = payload.owner;
+  const version = Number(payload.version);
   const createdAt = new Date(Number(event.timestampMs));
 
   await repo.upsertPool(tx, {
@@ -38,20 +35,16 @@ export async function handlePoolCreated(
   });
 }
 
-/**
- * Handles DepositEvent.
- * Requirement: 2.2, 2.4, 2.5
- */
 export async function handleDeposit(
   event: RawSuiEvent,
   repo: IndexerRepository,
   tx: TransactionClient,
   checkpointSeq: bigint
 ): Promise<void> {
-  const payload = event.parsedJson;
-  const poolId = String(payload.pool_id);
-  const coinType = String(payload.coin_type);
-  const amount = new Prisma.Decimal(String(payload.amount ?? 0));
+  const payload = event.parsedJson as unknown as DepositPayload;
+  const poolId = payload.pool_id;
+  const coinType = payload.coin_type.name;
+  const amount = new Prisma.Decimal(payload.amount);
   const timestamp = new Date(Number(event.timestampMs));
 
   await repo.ensurePoolExists(tx, poolId, timestamp);
@@ -69,24 +62,20 @@ export async function handleDeposit(
   });
 }
 
-/**
- * Handles WithdrawEvent.
- * Requirement: 2.3, 2.4, 2.5
- */
 export async function handleWithdraw(
   event: RawSuiEvent,
   repo: IndexerRepository,
   tx: TransactionClient,
   checkpointSeq: bigint
 ): Promise<void> {
-  const payload = event.parsedJson;
-  const poolId = String(payload.pool_id);
-  const coinType = String(payload.coin_type);
-  const amount = new Prisma.Decimal(String(payload.amount ?? 0));
+  const payload = event.parsedJson as unknown as WithdrawPayload;
+  const poolId = payload.pool_id;
+  const coinType = payload.coin_type.name;
+  const amount = new Prisma.Decimal(payload.amount);
   const timestamp = new Date(Number(event.timestampMs));
 
   await repo.ensurePoolExists(tx, poolId, timestamp);
-  
+
   const { warning, overdrawnAmount } = await repo.withdrawBalance(tx, poolId, coinType, amount);
   if (warning) {
     console.warn(

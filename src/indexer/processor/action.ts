@@ -1,26 +1,22 @@
 import { Prisma } from '@prisma/client';
-import { TransactionClient, IndexerRepository } from '../repository/indexer.repository.js';
-import { RawSuiEvent } from '../../shared/sui/client.js';
+import type { RawSuiEvent } from '../../shared/sui/client.js';
+import type { ActionProposedPayload, ActionSettledPayload } from '../../shared/types/events.js';
 import { mapKind } from '../../shared/mappers.js';
+import type { IndexerRepository, TransactionClient } from '../repository/indexer.repository.js';
 
-/**
- * Handles ActionProposedEvent.
- * Requirement: 5.1, 5.5, 5.6
- */
 export async function handleActionProposed(
   event: RawSuiEvent,
   repo: IndexerRepository,
   tx: TransactionClient,
   checkpointSeq: bigint
 ): Promise<void> {
-  const payload = event.parsedJson;
-  const poolId = String(payload.pool_id);
-  const agentAddress = String(payload.agent);
-  const nonce = BigInt(String(payload.nonce));
-  const rawKind = Number(payload.kind ?? 0);
-  const kind = mapKind(rawKind);
-  const amountIn = new Prisma.Decimal(String(payload.amount_in ?? 0));
-  const minAmountOut = new Prisma.Decimal(String(payload.min_amount_out ?? 0));
+  const payload = event.parsedJson as unknown as ActionProposedPayload;
+  const poolId = payload.pool_id;
+  const agentAddress = payload.agent;
+  const nonce = BigInt(payload.nonce);
+  const kind = mapKind(payload.kind);
+  const amountIn = new Prisma.Decimal(payload.amount_in);
+  const minAmountOut = new Prisma.Decimal(payload.min_amount_out);
   const proposedAt = new Date(Number(event.timestampMs));
 
   const success = await repo.insertActionProposed(tx, {
@@ -52,22 +48,18 @@ export async function handleActionProposed(
   });
 }
 
-/**
- * Handles ActionSettledEvent.
- * Requirement: 5.2, 5.3, 5.4, 5.6, 5.7
- */
 export async function handleActionSettled(
   event: RawSuiEvent,
   repo: IndexerRepository,
   tx: TransactionClient,
   checkpointSeq: bigint
 ): Promise<void> {
-  const payload = event.parsedJson;
-  const poolId = String(payload.pool_id);
-  const agentAddress = String(payload.agent);
-  const nonce = BigInt(String(payload.nonce));
-  const quotedAmountOut = new Prisma.Decimal(String(payload.quoted_amount_out ?? 0));
-  const settlementStatus = Number(payload.settlement_status ?? 0);
+  const payload = event.parsedJson as unknown as ActionSettledPayload;
+  const poolId = payload.pool_id;
+  const agentAddress = payload.agent;
+  const nonce = BigInt(payload.nonce);
+  const quotedAmountOut = new Prisma.Decimal(payload.quoted_amount_out);
+  const settlementStatus = payload.status;
   const settledAt = new Date(Number(event.timestampMs));
 
   const updated = await repo.updateActionSettled(tx, {
@@ -85,11 +77,9 @@ export async function handleActionSettled(
       `poolId=${poolId}, agentAddress=${agentAddress}, nonce=${nonce.toString()}`
     );
 
-    // Map kind and amounts to backfill
-    const rawKind = Number(payload.kind ?? 0);
-    const kind = mapKind(rawKind);
-    const amountIn = new Prisma.Decimal(String(payload.amount_in ?? 0));
-    const minAmountOut = new Prisma.Decimal(String(payload.min_amount_out ?? 0));
+    const kind = mapKind(payload.kind);
+    const amountIn = new Prisma.Decimal(payload.amount_in);
+    const minAmountOut = new Prisma.Decimal(payload.min_amount_out);
 
     try {
       await repo.backfillActionSettled(tx, {
@@ -108,7 +98,6 @@ export async function handleActionSettled(
         `[processor] Backfill action failed: poolId=${poolId}, agentAddress=${agentAddress}, nonce=${nonce.toString()}`,
         err
       );
-      // Skip processing of this settled event entirely by throwing, which will abort the transaction batch
       throw err;
     }
   }

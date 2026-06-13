@@ -1,4 +1,4 @@
-import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
+import { SuiJsonRpcClient, type SuiEvent } from '@mysten/sui/jsonRpc';
 
 export interface RawSuiEvent {
   id: { txDigest: string; eventSeq: string };
@@ -6,7 +6,7 @@ export interface RawSuiEvent {
   transactionModule: string;
   sender: string;
   type: string;
-  parsedJson: Record<string, any>;
+  parsedJson: Record<string, unknown>;
   timestampMs: string;
   checkpoint?: string;
 }
@@ -18,17 +18,17 @@ export interface SuiEventPage {
 }
 
 export class SuiClientWrapper {
-  private client: SuiClient;
+  private client: SuiJsonRpcClient;
   private packageId: string;
 
   constructor(rpcUrl: string, packageId: string) {
-    this.client = new SuiClient({ url: rpcUrl });
+    this.client = new SuiJsonRpcClient({ url: rpcUrl, network: 'testnet' });
     this.packageId = packageId;
   }
 
   /**
    * Queries events from the blockchain.
-   * Filters events to packageId and implements transient retry logic.
+   * Filters events to the core package's events module with retry logic.
    * Requirements: 1.1, 1.3, 1.5, 1.7
    */
   async queryEvents(cursor: string | null, limit: number): Promise<SuiEventPage> {
@@ -41,23 +41,22 @@ export class SuiClientWrapper {
       try {
         const response = await this.client.queryEvents({
           query: {
-            MovePackage: this.packageId,
-          } as any,
+            MoveEventModule: { package: this.packageId, module: 'events' },
+          },
           cursor: parsedCursor,
           limit,
           order: 'ascending',
         });
 
-        // Map response to RawSuiEvent
-        const events: RawSuiEvent[] = response.data.map((e) => ({
+        const events: RawSuiEvent[] = response.data.map((e: SuiEvent) => ({
           id: { txDigest: e.id.txDigest, eventSeq: e.id.eventSeq },
           packageId: e.packageId,
           transactionModule: e.transactionModule,
           sender: e.sender,
           type: e.type,
-          parsedJson: e.parsedJson as Record<string, any>,
-          timestampMs: e.timestampMs || String(Date.now()),
-          checkpoint: (e as any).checkpoint,
+          parsedJson: e.parsedJson as Record<string, unknown>,
+          timestampMs: e.timestampMs ?? String(Date.now()),
+          checkpoint: (e as Record<string, unknown>).checkpoint as string | undefined,
         }));
 
         const nextCursor = response.nextCursor ? JSON.stringify(response.nextCursor) : null;
@@ -67,9 +66,8 @@ export class SuiClientWrapper {
           nextCursor,
           hasNextPage: response.hasNextPage,
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
         attempt++;
-        // Determine if it is a transient error: network timeout, 5xx, or connection refused.
         const isTransient = this.isTransientError(error);
 
         if (!isTransient || attempt >= maxAttempts) {
@@ -77,7 +75,7 @@ export class SuiClientWrapper {
           process.exit(1);
         }
 
-        console.warn(`[sui] Transient error (attempt ${attempt}/${maxAttempts}). Retrying in ${delay}ms...`, error.message);
+        console.warn(`[sui] Transient error (attempt ${attempt}/${maxAttempts}). Retrying in ${delay}ms...`, (error as Error).message);
         await new Promise((resolve) => setTimeout(resolve, delay));
         delay *= 2;
       }
@@ -86,9 +84,8 @@ export class SuiClientWrapper {
     throw new Error('Sui client retry loop ended unexpectedly');
   }
 
-  private isTransientError(error: any): boolean {
-    const msg = String(error.message || '').toLowerCase();
-    // Network errors (ECONNREFUSED, timeout, fetch failures) or HTTP 5xx codes
+  private isTransientError(error: unknown): boolean {
+    const msg = String((error as Error).message || '').toLowerCase();
     if (
       msg.includes('timeout') ||
       msg.includes('econnrefused') ||
@@ -101,8 +98,8 @@ export class SuiClientWrapper {
     ) {
       return true;
     }
-    const status = error.status || error.statusCode;
-    if (status && status >= 500 && status < 600) {
+    const status = (error as Record<string, unknown>).status || (error as Record<string, unknown>).statusCode;
+    if (typeof status === 'number' && status >= 500 && status < 600) {
       return true;
     }
     return false;
