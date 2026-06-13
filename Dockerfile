@@ -1,5 +1,6 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
+RUN apk add --no-cache openssl
 COPY package*.json ./
 RUN npm ci
 COPY . .
@@ -8,10 +9,9 @@ RUN npm run build
 
 FROM node:22-alpine AS runtime
 WORKDIR /app
+RUN apk add --no-cache openssl
 COPY package*.json ./
-# Install production packages
 RUN npm ci --only=production
-# Install prisma globally so that programmatic migrations can run via child_process
 RUN npm install -g prisma@5.22.0
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
