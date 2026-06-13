@@ -4,20 +4,23 @@
   "description": "Pinace backend — modular Fastify REST API and background event indexer",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run generate:openapi",
     "dev": "tsx watch src/index.ts",
     "test": "vitest --run",
     "start": "node dist/index.js",
+    "generate:openapi": "tsx src/scripts/generate-openapi.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy"
   },
   "dependencies": {
-    "@pinace/contracts-sdk": "file:../contracts-sdk",
-    "@mysten/sui": "^2.17.0",
     "@fastify/cors": "^10.0.2",
+    "@fastify/swagger": "^9.7.0",
+    "@mysten/sui": "^2.17.0",
+    "@pinace/contracts-sdk": "file:../contracts-sdk",
     "@prisma/client": "^5.14.0",
     "fastify": "^5.3.2",
+    "fastify-type-provider-zod": "^4.0.2",
     "pino": "^9.6.0",
     "zod": "^3.24.2"
   },

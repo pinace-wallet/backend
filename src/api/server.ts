@@ -1,5 +1,7 @@
 import fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import swagger from '@fastify/swagger';
+import { serializerCompiler, validatorCompiler, jsonSchemaTransform } from 'fastify-type-provider-zod';
 import { PrismaClient } from '@prisma/client';
 import { AppConfig } from '../shared/config.js';
 import { ApiRepository } from './repository/api.repository.js';
@@ -25,6 +27,30 @@ export function buildApp(config: AppConfig, prisma: PrismaClient): FastifyInstan
     },
   });
 
+  // Use Zod for request validation and response serialization
+  app.setValidatorCompiler(validatorCompiler);
+  app.setSerializerCompiler(serializerCompiler);
+
+  // Collects route schemas to power the generate:openapi script.
+  // jsonSchemaTransform converts Zod schemas → OpenAPI-compatible JSON Schema.
+  app.register(swagger, {
+    transform: jsonSchemaTransform,
+    openapi: {
+      info: {
+        title: 'Pinace API',
+        version: '0.1.0',
+        description: 'REST API for Pinace Wallet — pools, agents, actions, and event logs.',
+      },
+      tags: [
+        { name: 'Health', description: 'Service health and indexer lag' },
+        { name: 'Pools', description: 'Liquidity pool data' },
+        { name: 'Agents', description: 'Agent accounts and policies' },
+        { name: 'Actions', description: 'Agent-initiated on-chain actions' },
+        { name: 'Events', description: 'Raw on-chain event logs' },
+      ],
+    },
+  });
+
   // Register CORS to allow chrome extension origins
   app.register(cors, {
     origin: (origin, cb) => {
@@ -33,7 +59,7 @@ export function buildApp(config: AppConfig, prisma: PrismaClient): FastifyInstan
         cb(null, true);
         return;
       }
-      
+
       // Allow Chrome Extension origins
       if (origin.startsWith('chrome-extension://')) {
         cb(null, true);
