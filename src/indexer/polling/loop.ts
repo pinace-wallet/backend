@@ -79,12 +79,23 @@ export class PollingLoop {
       let cursor: string | null = null;
 
       if (lastSeq !== null && lastSeq > 0n) {
-        // Find the event log matching this checkpoint sequence to reconstruct the cursor.
-        // We look for the latest event log in this checkpoint to get its transaction details.
-        const lastEvent = await this.prisma.eventLog.findFirst({
+        // The maxSeqInBatch stored in checkpoints is a synthetic monotonic
+        // counter (lastSeq + 1 per batch), not Sui's real checkpoint
+        // sequence — so on restart the saved value rarely matches any
+        // event_logs.checkpointSeq. First try the original lookup, then
+        // fall back to "whatever event we stored most recently" so
+        // queryEvents resumes from the right point instead of restarting
+        // from the beginning of history (which causes the loop to spin
+        // marking every page as already-processed).
+        const exactMatch = await this.prisma.eventLog.findFirst({
           where: { checkpointSeq: lastSeq },
           orderBy: { timestamp: 'desc' },
         });
+        const lastEvent =
+          exactMatch ??
+          (await this.prisma.eventLog.findFirst({
+            orderBy: [{ checkpointSeq: 'desc' }, { timestamp: 'desc' }],
+          }));
 
         if (lastEvent) {
           const payload = lastEvent.rawPayload as any;
