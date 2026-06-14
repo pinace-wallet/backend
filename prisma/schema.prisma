@@ -63,6 +63,10 @@ model Policy {
   policyType    String    @map("policy_type")
   configHash    String?   @map("config_hash")
   marketplaceId String?   @map("marketplace_id")
+  /// Denormalized policy config fetched from on-chain
+  /// pool.delegations[agent].configs[policyType]. Null when the on-chain
+  /// read failed or the policy has been removed.
+  config        Json?     @map("config")
   status        String    @default("attached") @map("status")
   attachedAt    DateTime? @map("attached_at") @db.Timestamptz
   updatedAt     DateTime? @map("updated_at") @db.Timestamptz

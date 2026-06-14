@@ -203,10 +203,12 @@ export class IndexerRepository {
       policyType: string;
       configHash: string | null;
       marketplaceId: string | null;
+      config: Prisma.InputJsonValue | null;
       status: string;
       attachedAt: Date;
     }
   ): Promise<void> {
+    const configValue = data.config === null ? Prisma.JsonNull : data.config;
     await tx.policy.upsert({
       where: {
         poolId_agentAddress_policyType: {
@@ -221,12 +223,14 @@ export class IndexerRepository {
         policyType: data.policyType,
         configHash: data.configHash,
         marketplaceId: data.marketplaceId,
+        config: configValue,
         status: data.status,
         attachedAt: data.attachedAt,
       },
       update: {
         configHash: data.configHash,
         marketplaceId: data.marketplaceId,
+        config: configValue,
         status: data.status,
         attachedAt: data.attachedAt,
       },
@@ -245,6 +249,7 @@ export class IndexerRepository {
       policyType: string;
       configHash: string | null;
       marketplaceId: string | null;
+      config: Prisma.InputJsonValue | null;
       updatedAt: Date;
     }
   ): Promise<boolean> {
@@ -259,6 +264,7 @@ export class IndexerRepository {
     });
     if (!policy) return false;
 
+    const configValue = data.config === null ? Prisma.JsonNull : data.config;
     await tx.policy.update({
       where: {
         poolId_agentAddress_policyType: {
@@ -270,6 +276,7 @@ export class IndexerRepository {
       data: {
         configHash: data.configHash,
         marketplaceId: data.marketplaceId,
+        config: configValue,
         updatedAt: data.updatedAt,
       },
     });

@@ -84,6 +84,60 @@ export class SuiClientWrapper {
     throw new Error('Sui client retry loop ended unexpectedly');
   }
 
+  /**
+   * Reads the on-chain Config struct attached to a (pool, agent, policyType)
+   * by walking dynamic fields:
+   *   pool.delegations: Table<address, Delegation>  → DF(agent)
+   *     .value.configs: Bag<TypeName, Config>       → DF(policyType TypeName)
+   *       .value.fields                              ← the actual config values
+   *
+   * Returns `null` on any 404 / parse failure — handler should still persist
+   * the policy row so removal events still match.
+   */
+  async readPolicyConfig(
+    poolId: string,
+    agentAddress: string,
+    policyType: string,
+  ): Promise<Record<string, unknown> | null> {
+    try {
+      const pool = await this.client.getObject({ id: poolId, options: { showContent: true } });
+      const poolContent = (pool.data?.content as { fields?: Record<string, unknown> } | undefined)
+        ?.fields;
+      const delegations = (poolContent?.delegations as { fields?: { id?: { id?: string } } } | undefined)
+        ?.fields;
+      const delegationsTableId = delegations?.id?.id;
+      if (!delegationsTableId) return null;
+
+      const dfDelegation = await this.client.getDynamicFieldObject({
+        parentId: delegationsTableId,
+        name: { type: 'address', value: agentAddress },
+      });
+      const delegationFields = (dfDelegation.data?.content as { fields?: Record<string, unknown> } | undefined)
+        ?.fields;
+      const delValue = (delegationFields?.value as { fields?: Record<string, unknown> } | undefined)
+        ?.fields;
+      const configsBagId = (
+        delValue?.configs as { fields?: { id?: { id?: string } } } | undefined
+      )?.fields?.id?.id;
+      if (!configsBagId) return null;
+
+      const dfConfig = await this.client.getDynamicFieldObject({
+        parentId: configsBagId,
+        name: { type: '0x1::type_name::TypeName', value: { name: policyType } },
+      });
+      const cfgWrap = (dfConfig.data?.content as { fields?: Record<string, unknown> } | undefined)
+        ?.fields;
+      const cfgValue = (cfgWrap?.value as { fields?: Record<string, unknown> } | undefined)?.fields;
+      return cfgValue ?? null;
+    } catch (e) {
+      console.warn(
+        `[sui] readPolicyConfig failed for pool=${poolId} agent=${agentAddress} type=${policyType}:`,
+        (e as Error).message,
+      );
+      return null;
+    }
+  }
+
   private isTransientError(error: unknown): boolean {
     const msg = String((error as Error).message || '').toLowerCase();
     if (

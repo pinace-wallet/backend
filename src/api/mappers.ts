@@ -15,6 +15,9 @@ export interface PolicyDto {
   policyType: string;
   configHash: string | null;
   marketplaceId: string | null;
+  /** Denormalized on-chain config (e.g. spending_limit Config fields).
+   * Null until backfilled or when the on-chain read fails. */
+  config: Record<string, unknown> | null;
   status: string;
   attachedAt: number | null; // Unix epoch ms
   updatedAt: number | null;
@@ -98,6 +101,7 @@ export function toPolicyDto(policy: Policy): PolicyDto {
     policyType: policy.policyType,
     configHash: policy.configHash,
     marketplaceId: policy.marketplaceId,
+    config: (policy.config ?? null) as Record<string, unknown> | null,
     status: policy.status,
     attachedAt: policy.attachedAt ? policy.attachedAt.getTime() : null,
     updatedAt: policy.updatedAt ? policy.updatedAt.getTime() : null,

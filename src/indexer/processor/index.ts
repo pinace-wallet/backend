@@ -1,5 +1,5 @@
 import { TransactionClient, IndexerRepository } from '../repository/indexer.repository.js';
-import { RawSuiEvent } from '../../shared/sui/client.js';
+import { RawSuiEvent, SuiClientWrapper } from '../../shared/sui/client.js';
 import { handlePoolCreated, handleDeposit, handleWithdraw } from './pool.js';
 import { handleAgentConnected, handleAgentRevoked } from './agent.js';
 import { handlePolicyAttached, handlePolicyUpdated, handlePolicyRemoved } from './policy.js';
@@ -7,9 +7,11 @@ import { handleActionProposed, handleActionSettled } from './action.js';
 
 export class EventProcessor {
   private repo: IndexerRepository;
+  private suiClient: SuiClientWrapper;
 
-  constructor(repo: IndexerRepository) {
+  constructor(repo: IndexerRepository, suiClient: SuiClientWrapper) {
     this.repo = repo;
+    this.suiClient = suiClient;
   }
 
   /**
@@ -54,9 +56,9 @@ export class EventProcessor {
       } else if (typeName.endsWith('::AgentRevokedEvent')) {
         await handleAgentRevoked(event, this.repo, tx, checkpointSeq);
       } else if (typeName.endsWith('::PolicyAttachedEvent')) {
-        await handlePolicyAttached(event, this.repo, tx, checkpointSeq);
+        await handlePolicyAttached(event, this.repo, tx, checkpointSeq, this.suiClient);
       } else if (typeName.endsWith('::PolicyUpdatedEvent')) {
-        await handlePolicyUpdated(event, this.repo, tx, checkpointSeq);
+        await handlePolicyUpdated(event, this.repo, tx, checkpointSeq, this.suiClient);
       } else if (typeName.endsWith('::PolicyRemovedEvent')) {
         await handlePolicyRemoved(event, this.repo, tx, checkpointSeq);
       } else if (typeName.endsWith('::ActionProposedEvent')) {

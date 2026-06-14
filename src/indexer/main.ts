@@ -20,7 +20,7 @@ async function main() {
   // 4. Initialize components
   const suiClient = new SuiClientWrapper(config.suiRpcUrl, config.packageId);
   const repo = new IndexerRepository();
-  const processor = new EventProcessor(repo);
+  const processor = new EventProcessor(repo, suiClient);
   const pollingLoop = new PollingLoop(
     suiClient,
     processor,
