@@ -330,6 +330,12 @@ export const openapi = {
                                   "type": "string",
                                   "nullable": true
                                 },
+                                "config": {
+                                  "type": "object",
+                                  "additionalProperties": {},
+                                  "nullable": true,
+                                  "description": "Denormalized on-chain Config fields (e.g. spending_limit, slippage_bps, window_ms). Null if the on-chain read failed or backfill is pending."
+                                },
                                 "status": {
                                   "type": "string"
                                 },
@@ -354,6 +360,7 @@ export const openapi = {
                                 "policyType",
                                 "configHash",
                                 "marketplaceId",
+                                "config",
                                 "status",
                                 "attachedAt",
                                 "updatedAt",
@@ -497,6 +504,12 @@ export const openapi = {
                             "type": "string",
                             "nullable": true
                           },
+                          "config": {
+                            "type": "object",
+                            "additionalProperties": {},
+                            "nullable": true,
+                            "description": "Denormalized on-chain Config fields (e.g. spending_limit, slippage_bps, window_ms). Null if the on-chain read failed or backfill is pending."
+                          },
                           "status": {
                             "type": "string"
                           },
@@ -521,6 +534,7 @@ export const openapi = {
                           "policyType",
                           "configHash",
                           "marketplaceId",
+                          "config",
                           "status",
                           "attachedAt",
                           "updatedAt",

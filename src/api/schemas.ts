@@ -79,6 +79,7 @@ export const PolicyDtoSchema = z.object({
   policyType: z.string(),
   configHash: z.string().nullable(),
   marketplaceId: z.string().nullable(),
+  config: z.record(z.unknown()).nullable().describe('Denormalized on-chain Config fields (e.g. spending_limit, slippage_bps, window_ms). Null if the on-chain read failed or backfill is pending.'),
   status: z.string(),
   attachedAt: z.number().nullable().describe('Unix epoch ms'),
   updatedAt: z.number().nullable().describe('Unix epoch ms'),
