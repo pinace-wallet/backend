@@ -66,6 +66,12 @@ export function buildApp(config: AppConfig, prisma: PrismaClient): FastifyInstan
         return;
       }
 
+      // Allow Pinace Agent web (local dev + deployed) and any localhost dev origin
+      if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        cb(null, true);
+        return;
+      }
+
       // Default fallback
       cb(null, false);
     },
