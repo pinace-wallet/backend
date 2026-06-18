@@ -72,7 +72,7 @@ export class SuiClientWrapper {
 
         if (!isTransient || attempt >= maxAttempts) {
           console.error(`[sui] Final queryEvents failure after attempt ${attempt}:`, error);
-          process.exit(1);
+          throw error;
         }
 
         console.warn(`[sui] Transient error (attempt ${attempt}/${maxAttempts}). Retrying in ${delay}ms...`, (error as Error).message);
