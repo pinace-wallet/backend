@@ -26,6 +26,18 @@ export class ApiController {
   }
 
   /**
+   * Handler: GET /owners/:address/stats — aggregate exec metrics for the
+   * wallet home page tiles.
+   */
+  async getOwnerStats(
+    req: FastifyRequest<{ Params: { address: string } }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const stats = await this.service.getOwnerStats(req.params.address);
+    reply.send(stats);
+  }
+
+  /**
    * Handler: GET /agents
    * Requirement: 7.2, 7.6, 7.8
    */

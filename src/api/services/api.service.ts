@@ -10,6 +10,17 @@ export interface PaginatedDto<T> {
   limit: number;
 }
 
+export interface OwnerStatsDto {
+  owner: string;
+  totalAgents: number;
+  executingCount: number;
+  successCount: number;
+  settledCount: number;
+  inFlightCount: number;
+  /** success / settled — null when no settled actions yet. */
+  successRate: number | null;
+}
+
 export interface TimelineDto {
   events: EventLogDto[];
   milestones: MilestoneDto[];
@@ -37,6 +48,23 @@ export class ApiService {
     const pool = await this.repo.getPoolWithBalances(poolId);
     if (!pool) return null;
     return mappers.toPoolDto(pool);
+  }
+
+  /**
+   * Aggregate execution stats across every agent the given owner controls.
+   * Drives the wallet home page's "Executing" + "Success rate" tiles.
+   */
+  async getOwnerStats(owner: string): Promise<OwnerStatsDto> {
+    const r = await this.repo.getOwnerStats(owner);
+    return {
+      owner,
+      totalAgents: r.totalAgents,
+      executingCount: r.executingAgents,
+      successCount: r.success,
+      settledCount: r.settled,
+      inFlightCount: r.inFlight,
+      successRate: r.settled > 0 ? r.success / r.settled : null,
+    };
   }
 
   /**

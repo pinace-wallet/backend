@@ -17,6 +17,20 @@ export const AgentParamsSchema = z.object({
   agentId: z.string().describe('Agent database UUID'),
 });
 
+export const OwnerParamsSchema = z.object({
+  address: z.string().describe('Owner Sui address (0x-prefixed)'),
+});
+
+export const OwnerStatsDtoSchema = z.object({
+  owner: z.string(),
+  totalAgents: z.number(),
+  executingCount: z.number().describe('Distinct agents with at least one proposed-but-unsettled action.'),
+  successCount: z.number(),
+  settledCount: z.number(),
+  inFlightCount: z.number(),
+  successRate: z.number().nullable().describe('successCount / settledCount; null when no settled actions yet.'),
+});
+
 export const ActionParamsSchema = z.object({
   actionId: z.string().describe('Action database UUID'),
 });

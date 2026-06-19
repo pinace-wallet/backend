@@ -12,6 +12,7 @@ import { ApiController } from './controllers/api.controller.js';
 import healthRoutes from './routes/health.js';
 import poolRoutes from './routes/pools.js';
 import agentRoutes from './routes/agents.js';
+import ownerRoutes from './routes/owners.js';
 import timelineRoutes from './routes/timeline.js';
 import actionRoutes from './routes/actions.js';
 import eventRoutes from './routes/events.js';
@@ -88,6 +89,7 @@ export function buildApp(config: AppConfig, prisma: PrismaClient): FastifyInstan
   app.register(healthRoutes, { controller });
   app.register(poolRoutes, { controller });
   app.register(agentRoutes, { controller });
+  app.register(ownerRoutes, { controller });
   app.register(timelineRoutes, { controller });
   app.register(actionRoutes, { controller });
   app.register(eventRoutes, { controller });

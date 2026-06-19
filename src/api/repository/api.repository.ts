@@ -130,6 +130,50 @@ export class ApiRepository {
   }
 
   /**
+   * Aggregate execution statistics for every agent owned by `owner`. One
+   * query — does the join + conditional counts in Postgres so we don't pull
+   * row data into Node just to count.
+   */
+  async getOwnerStats(owner: string): Promise<{
+    inFlight: number;
+    success: number;
+    settled: number;
+    executingAgents: number;
+    totalAgents: number;
+  }> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        in_flight: bigint;
+        success: bigint;
+        settled: bigint;
+        executing_agents: bigint;
+        total_agents: bigint;
+      }>
+    >`
+      SELECT
+        COUNT(*) FILTER (WHERE a.status = 'proposed' AND a.settled_at IS NULL) AS in_flight,
+        COUNT(*) FILTER (WHERE a.status = 'settled' AND a.settlement_status = 1) AS success,
+        COUNT(*) FILTER (WHERE a.status = 'settled') AS settled,
+        COUNT(DISTINCT CASE WHEN a.status = 'proposed' AND a.settled_at IS NULL THEN a.agent_address END) AS executing_agents,
+        (SELECT COUNT(*) FROM agents WHERE owner = ${owner})::bigint AS total_agents
+      FROM actions a
+      JOIN agents ag ON ag.pool_id = a.pool_id AND ag.agent_address = a.agent_address
+      WHERE ag.owner = ${owner}
+    `;
+    const r = rows[0];
+    if (!r) {
+      return { inFlight: 0, success: 0, settled: 0, executingAgents: 0, totalAgents: 0 };
+    }
+    return {
+      inFlight: Number(r.in_flight),
+      success: Number(r.success),
+      settled: Number(r.settled),
+      executingAgents: Number(r.executing_agents),
+      totalAgents: Number(r.total_agents),
+    };
+  }
+
+  /**
    * Fetches paginated event logs with optional filters.
    * Requirement: 7.5
    */
