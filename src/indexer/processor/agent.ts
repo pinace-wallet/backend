@@ -15,6 +15,14 @@ export async function handleAgentConnected(
   const expiresMs = BigInt(payload.expires_ms);
   const connectedAt = new Date(Number(event.timestampMs));
 
+  // Defensive: if we re-pointed the indexer at a different package
+  // mid-stream (or the PoolCreatedEvent landed in a checkpoint range
+  // we hadn't polled yet), the pool FK target is missing and the
+  // upsertAgent below explodes with `agents_pool_id_fkey`. Backfill a
+  // placeholder pool row so the FK holds; PoolCreatedEvent (if it ever
+  // arrives) will upsert real fields over it via upsertPool.
+  await repo.ensurePoolExists(tx, poolId, connectedAt);
+
   await repo.upsertAgent(tx, {
     poolId,
     agentAddress,
