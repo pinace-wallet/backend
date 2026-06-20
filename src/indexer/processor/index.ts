@@ -4,6 +4,30 @@ import { handlePoolCreated, handleDeposit, handleWithdraw } from './pool.js';
 import { handleAgentConnected, handleAgentRevoked } from './agent.js';
 import { handlePolicyAttached, handlePolicyUpdated, handlePolicyRemoved } from './policy.js';
 import { handleActionProposed, handleActionSettled } from './action.js';
+import { ssePublisher, SseEventKind } from '../../shared/sse/publisher.js';
+
+/**
+ * Map Move event type suffix → SSE event kind. After the DB write lands
+ * we fan the event out to any /stream subscriber matching owner/pool.
+ */
+const TYPE_TO_KIND: Record<string, SseEventKind> = {
+  PoolCreatedEvent: 'pool_created',
+  DepositEvent: 'pool_deposit',
+  WithdrawEvent: 'pool_withdraw',
+  AgentConnectedEvent: 'agent_connected',
+  AgentRevokedEvent: 'agent_revoked',
+  PolicyAttachedEvent: 'policy_attached',
+  PolicyUpdatedEvent: 'policy_updated',
+  PolicyRemovedEvent: 'policy_removed',
+  ActionProposedEvent: 'action_proposed',
+  ActionSettledEvent: 'action_settled',
+};
+
+function suffix(typeName: string): string | null {
+  // "0x...::events::PoolCreatedEvent" → "PoolCreatedEvent"
+  const parts = typeName.split('::');
+  return parts[parts.length - 1] ?? null;
+}
 
 export class EventProcessor {
   private repo: IndexerRepository;
@@ -68,6 +92,35 @@ export class EventProcessor {
       } else {
         // Unknown event type, log debug and skip
         console.debug(`[processor] Skipping unrecognized event type: ${typeName}`);
+        continue;
+      }
+
+      // Single SSE fan-out point — runs after every recognised handler
+      // succeeds. Pulls owner / pool / agent from the parsed payload so
+      // subscribers can filter without re-querying the DB.
+      const kind = TYPE_TO_KIND[suffix(typeName) ?? ''];
+      if (kind) {
+        const p = (event.parsedJson ?? {}) as Record<string, unknown>;
+        const owner =
+          typeof p.owner === 'string'
+            ? p.owner.toLowerCase()
+            : undefined;
+        const poolId =
+          typeof p.pool_id === 'string' ? p.pool_id : undefined;
+        const agentAddress =
+          typeof p.agent === 'string'
+            ? p.agent
+            : typeof p.agent_address === 'string'
+              ? p.agent_address
+              : undefined;
+        ssePublisher.publish({
+          kind,
+          owner,
+          poolId,
+          agentAddress,
+          ts: Date.now(),
+          data: { txDigest: event.id.txDigest, ...p },
+        });
       }
     }
   }

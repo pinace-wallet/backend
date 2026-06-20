@@ -16,6 +16,7 @@ import ownerRoutes from './routes/owners.js';
 import timelineRoutes from './routes/timeline.js';
 import actionRoutes from './routes/actions.js';
 import eventRoutes from './routes/events.js';
+import streamRoutes from './routes/stream.js';
 
 /**
  * Builds the Fastify application instance.
@@ -93,6 +94,7 @@ export function buildApp(config: AppConfig, prisma: PrismaClient): FastifyInstan
   app.register(timelineRoutes, { controller });
   app.register(actionRoutes, { controller });
   app.register(eventRoutes, { controller });
+  app.register(streamRoutes);
 
   return app;
 }
