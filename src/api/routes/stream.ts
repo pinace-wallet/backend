@@ -1,5 +1,12 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { z } from 'zod';
 import { ssePublisher, type SsePayload } from '../../shared/sse/publisher.js';
+
+const StreamQuerySchema = z.object({
+  owner: z.string().optional(),
+  poolId: z.string().optional(),
+  agentAddress: z.string().optional(),
+});
 
 /**
  * Server-Sent Events stream of indexed Pinace events.
@@ -33,14 +40,7 @@ export default async function streamRoutes(fastify: FastifyInstance) {
         tags: ['Events'],
         summary:
           'Live SSE feed of indexed Pinace events (pool / agent / policy / action).',
-        querystring: {
-          type: 'object',
-          properties: {
-            owner: { type: 'string' },
-            poolId: { type: 'string' },
-            agentAddress: { type: 'string' },
-          },
-        },
+        querystring: StreamQuerySchema,
       },
     },
     async (req: FastifyRequest<{ Querystring: StreamQuery }>, reply: FastifyReply) => {
