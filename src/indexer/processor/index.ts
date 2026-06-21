@@ -3,7 +3,12 @@ import { RawSuiEvent, SuiClientWrapper } from '../../shared/sui/client.js';
 import { handlePoolCreated, handleDeposit, handleWithdraw } from './pool.js';
 import { handleAgentConnected, handleAgentRevoked } from './agent.js';
 import { handlePolicyAttached, handlePolicyUpdated, handlePolicyRemoved } from './policy.js';
-import { handleActionProposed, handleActionSettled } from './action.js';
+import {
+  handleActionProposed,
+  handleActionSettled,
+  handleFlowAuthorized,
+  handleFlowCompleted,
+} from './action.js';
 import { ssePublisher, SseEventKind } from '../../shared/sse/publisher.js';
 
 /**
@@ -21,6 +26,8 @@ const TYPE_TO_KIND: Record<string, SseEventKind> = {
   PolicyRemovedEvent: 'policy_removed',
   ActionProposedEvent: 'action_proposed',
   ActionSettledEvent: 'action_settled',
+  FlowAuthorizedEvent: 'pool_withdraw',
+  FlowCompletedEvent: 'pool_deposit',
 };
 
 function suffix(typeName: string): string | null {
@@ -89,6 +96,10 @@ export class EventProcessor {
         await handleActionProposed(event, this.repo, tx, checkpointSeq);
       } else if (typeName.endsWith('::ActionSettledEvent')) {
         await handleActionSettled(event, this.repo, tx, checkpointSeq);
+      } else if (typeName.endsWith('::FlowAuthorizedEvent')) {
+        await handleFlowAuthorized(event, this.repo, tx, checkpointSeq);
+      } else if (typeName.endsWith('::FlowCompletedEvent')) {
+        await handleFlowCompleted(event, this.repo, tx, checkpointSeq);
       } else {
         // Unknown event type, log debug and skip
         console.debug(`[processor] Skipping unrecognized event type: ${typeName}`);
