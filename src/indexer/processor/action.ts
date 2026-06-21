@@ -4,6 +4,53 @@ import type { ActionProposedPayload, ActionSettledPayload } from '../../shared/t
 import { mapKind } from '../../shared/mappers.js';
 import type { IndexerRepository, TransactionClient } from '../repository/indexer.repository.js';
 
+/**
+ * Re-implement spending_limit_policy::prove window math in TS so the
+ * indexer's denormalized policy.config (spent_in_window, window_started_ms)
+ * advances in lockstep with chain. Called from handleFlowAuthorized.
+ */
+async function bumpSpendingLimitSpent(
+  tx: TransactionClient,
+  poolId: string,
+  agentAddress: string,
+  amount: Prisma.Decimal,
+  swapTs: Date,
+): Promise<void> {
+  const rows = await tx.policy.findMany({
+    where: { poolId, agentAddress, status: 'attached' },
+  });
+  for (const row of rows) {
+    // Only the spending-limit policy carries a window_ms / spent_in_window.
+    if (!row.policyType.endsWith('::spending_limit_policy::Witness')) continue;
+    const cfg = (row.config ?? {}) as Record<string, string | number>;
+    const windowMs = BigInt(cfg.window_ms ?? '0');
+    if (windowMs === 0n) continue;
+    const windowStartedMs = BigInt(cfg.window_started_ms ?? '0');
+    const spentInWindow = BigInt(cfg.spent_in_window ?? '0');
+    const nowMs = BigInt(swapTs.getTime());
+    const amt = BigInt(amount.toFixed(0));
+    let nextStart = windowStartedMs;
+    let nextSpent = spentInWindow;
+    if (windowStartedMs === 0n || nowMs - windowStartedMs >= windowMs) {
+      nextStart = nowMs;
+      nextSpent = amt;
+    } else {
+      nextSpent = spentInWindow + amt;
+    }
+    await tx.policy.update({
+      where: { id: row.id },
+      data: {
+        config: {
+          ...cfg,
+          spent_in_window: nextSpent.toString(),
+          window_started_ms: nextStart.toString(),
+        },
+        updatedAt: swapTs,
+      },
+    });
+  }
+}
+
 export async function handleActionProposed(
   event: RawSuiEvent,
   repo: IndexerRepository,
@@ -80,6 +127,11 @@ export async function handleFlowAuthorized(
       `[processor] FlowAuthorized over-withdraw for ${poolId} ${coinIn} ${amountIn}`,
     );
   }
+  // Replicate spending_limit_policy::prove window math so the indexer's
+  // denormalized config.spent_in_window stays in lockstep with chain.
+  // Without this, Fenik's checkSwapAllowed reads stale 0 and waves
+  // through swaps that on-chain prove() then aborts with abort 102.
+  await bumpSpendingLimitSpent(tx, poolId, payload.agent, amountIn, ts);
   await repo.insertEventLog(tx, {
     eventType: 'FlowAuthorizedEvent',
     poolId,
