@@ -1,8 +1,13 @@
-# Pinace Backend: REST API & Onchain Event Indexer
+# Pinace Backend — REST API + On-chain Event Indexer
 
-Pinace Backend is a modular TypeScript backend application for the Pinace Wallet. It is divided into two primary sub-services connected via a shared PostgreSQL database:
-1. **Onchain Event Indexer**: A stateful, singleton background worker that polls Sui blockchain events, processes them atomically, and persists pool balances, agents, policies, actions, and audit logs.
-2. **REST API Server**: A stateless, horizontally scalable Fastify web server that exposes endpoints queried by the Frontend browser extension.
+Indexer for the Pinace agent-delegation protocol on Sui. Two sub-services on a shared Postgres:
+
+1. **Indexer** — singleton worker that polls Sui events, processes them atomically, and persists pool balances, agents, policies, actions, audit logs.
+2. **REST API** — stateless Fastify server queried by the wallet extension + Fenik agent POC.
+
+- **Live**: `http://54.80.234.72:3001` (AWS EC2, Docker Compose, behind nginx)
+- **Move package** (testnet): `0x5be5ab02…2a751a23b`
+- **Health**: [`/health`](http://54.80.234.72:3001/health) returns 503 if indexer lag > 60s
 
 ---
 
@@ -134,7 +139,7 @@ docker-compose up --build
 
 ## 7. REST API Endpoints
 
-All endpoints support CORS for Chrome Extension origins (`chrome-extension://*`) and return camelCase JSON.
+CORS allowlist: `chrome-extension://*` (any Pinace extension build), `localhost`/`127.0.0.1` (any port), `https://fenik.one`, `https://pinace.xyz`. All responses are camelCase JSON.
 
 ### GET `/health`
 Returns indexing status and lag time. Returns HTTP `503` if lag exceeds 60 seconds.
@@ -184,7 +189,24 @@ Returns paginated list of agents. Filters: `owner`, `poolId`, `status`. Page siz
 ```
 
 ### GET `/agents/:agentId`
-Returns an agent details joined with active policies (`status = 'attached'`).
+Returns the agent joined with active policies (`status = 'attached'`). The `policies[].config` field is **denormalized from the on-chain policy object** so the wallet + agent can pre-flight a swap without an extra Sui RPC roundtrip.
+
+### GET `/owners/:address/stats`
+Aggregate counters for an owner: total agents, executing / success / settled / in-flight counts, success rate.
+```json
+{
+  "owner": "0xowner...",
+  "totalAgents": 28,
+  "executingCount": 2,
+  "successCount": 91,
+  "settledCount": 87,
+  "inFlightCount": 0,
+  "successRate": 95.6
+}
+```
+
+### GET `/stream` (SSE)
+Server-sent events stream of every indexed event in real time. Consumers (wallet popup, agent POC) subscribe to react to swap settlement / policy changes without polling. Event format mirrors `/events` rows.
 
 ### GET `/agents/:agentId/timeline`
 Returns chronologically sorted events list, milestone checkpoints, and volume statistics summary for an agent address. Supports `before` ISO timestamp string cursor for pagination.

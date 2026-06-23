@@ -68,8 +68,20 @@ export function buildApp(config: AppConfig, prisma: PrismaClient): FastifyInstan
         return;
       }
 
-      // Allow Pinace Agent web (local dev + deployed) and any localhost dev origin
+      // Localhost dev (any port) — fenik POC, wallet popup, ad-hoc tools.
       if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        cb(null, true);
+        return;
+      }
+
+      // Pinace web origins: production agent POC + landing.
+      const allowed = new Set([
+        "https://fenik.one",
+        "https://www.fenik.one",
+        "https://pinace.xyz",
+        "https://www.pinace.xyz",
+      ]);
+      if (allowed.has(origin)) {
         cb(null, true);
         return;
       }
