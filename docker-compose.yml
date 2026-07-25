@@ -15,7 +15,7 @@ services:
     build: .
     environment:
       SUI_RPC_URL: https://fullnode.testnet.sui.io:443
-      PACKAGE_ID: 0x48fe6e060674e81288375a770fc4ad3022d2ca07ea28fb77b3d8ecfb8c115c04
+      PACKAGE_ID: 0x5be5ab0292590e61e2dc21d11cc7174970f48e5ff54c88d4797c81b2a751a23b
       DATABASE_URL: postgresql://pinace:secret@postgres:5432/pinace_indexer
       POLL_INTERVAL_MS: 2000
       BATCH_SIZE: 50
