@@ -16,7 +16,7 @@ import { Prisma } from '@prisma/client';
 async function main() {
   const cfg = loadConfig();
   const prisma = getPrismaClient(cfg.databaseUrl);
-  const sui = new SuiClientWrapper(cfg.suiRpcUrl, cfg.packageId);
+  const sui = new SuiClientWrapper(cfg.suiGrpcUrl, cfg.suiGraphqlUrl, cfg.packageId, cfg.suiNetwork);
 
   const rows = await prisma.policy.findMany({
     where: { status: 'attached' },

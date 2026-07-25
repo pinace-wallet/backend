@@ -8,6 +8,8 @@
 
 // Provide dummy env vars so loadConfig() doesn't exit
 process.env.SUI_RPC_URL = 'https://fullnode.mainnet.sui.io:443';
+process.env.SUI_GRAPHQL_URL = 'https://sui-mainnet.mystenlabs.com/graphql';
+process.env.SUI_NETWORK = 'mainnet';
 process.env.PACKAGE_ID = '0x' + '0'.repeat(64);
 process.env.DATABASE_URL = 'postgresql://localhost/pinace_openapi_gen';
 

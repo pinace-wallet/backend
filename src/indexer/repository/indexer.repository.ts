@@ -15,14 +15,24 @@ export class IndexerRepository {
   }
 
   /**
+   * Reads the opaque GraphQL events-connection cursor to resume queryEvents() from.
+   */
+  async getCursor(tx: TransactionClient): Promise<string | null> {
+    const cp = await tx.checkpoint.findUnique({
+      where: { id: 1 },
+    });
+    return cp?.lastCursor ?? null;
+  }
+
+  /**
    * Saves the checkpoint cursor.
    * Requirement: 1.6
    */
-  async upsertCheckpoint(tx: TransactionClient, seq: bigint): Promise<void> {
+  async upsertCheckpoint(tx: TransactionClient, seq: bigint, cursor: string | null): Promise<void> {
     await tx.checkpoint.upsert({
       where: { id: 1 },
-      create: { id: 1, lastCheckpointSeq: seq, updatedAt: new Date() },
-      update: { lastCheckpointSeq: seq, updatedAt: new Date() },
+      create: { id: 1, lastCheckpointSeq: seq, lastCursor: cursor, updatedAt: new Date() },
+      update: { lastCheckpointSeq: seq, lastCursor: cursor, updatedAt: new Date() },
     });
   }
 

@@ -1,4 +1,8 @@
-import { SuiJsonRpcClient, type SuiEvent } from '@mysten/sui/jsonRpc';
+import { SuiGrpcClient } from '@mysten/sui/grpc';
+import { SuiGraphQLClient } from '@mysten/sui/graphql';
+import { bcs, pureBcsSchemaFromTypeName } from '@mysten/sui/bcs';
+
+export type SuiNetwork = 'mainnet' | 'testnet' | 'devnet' | 'localnet';
 
 export interface RawSuiEvent {
   id: { txDigest: string; eventSeq: string };
@@ -13,58 +17,119 @@ export interface RawSuiEvent {
 
 export interface SuiEventPage {
   events: RawSuiEvent[];
+  // Opaque Relay-style GraphQL cursor. Not comparable/parseable — persist and
+  // round-trip it as-is (see IndexerRepository.getCursor/upsertCheckpoint).
   nextCursor: string | null;
   hasNextPage: boolean;
 }
 
-export class SuiClientWrapper {
-  private client: SuiJsonRpcClient;
-  private packageId: string;
+interface QueryModuleEventsResult {
+  events: {
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+    nodes: Array<{
+      sender: { address: string } | null;
+      timestamp: string | null;
+      sequenceNumber: number | string;
+      transactionModule: { name: string; package: { address: string } | null } | null;
+      contents: { json: Record<string, unknown> | null; type: { repr: string } | null } | null;
+      transaction: { digest: string } | null;
+    }>;
+  } | null;
+}
 
-  constructor(rpcUrl: string, packageId: string) {
-    this.client = new SuiJsonRpcClient({ url: rpcUrl, network: 'testnet' });
-    this.packageId = packageId;
+const QUERY_MODULE_EVENTS = `
+  query QueryModuleEvents($module: String!, $first: Int!, $after: String) {
+    events(filter: { module: $module }, first: $first, after: $after) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        sender { address }
+        timestamp
+        sequenceNumber
+        transactionModule { name package { address } }
+        contents { json type { repr } }
+        transaction { digest }
+      }
+    }
+  }
+`;
+
+/**
+ * Unwraps a Move struct's field map from a gRPC `include: { json: true }` response.
+ * Mysten's docs warn the exact shape (flat vs. `{ fields: {...} }`-wrapped, as JSON-RPC
+ * used to return) may vary between API implementations — handle both defensively.
+ */
+function unwrapFields(v: unknown): Record<string, unknown> | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const obj = v as Record<string, unknown>;
+  if (obj.fields && typeof obj.fields === 'object') {
+    return obj.fields as Record<string, unknown>;
+  }
+  return obj;
+}
+
+/** Unwraps a Move `UID`/`ID` value, which may be a plain string or `{ id: "0x.." }`. */
+function unwrapId(v: unknown): string | undefined {
+  if (typeof v === 'string') return v;
+  if (v && typeof v === 'object') {
+    const id = (v as Record<string, unknown>).id;
+    if (typeof id === 'string') return id;
+  }
+  return undefined;
+}
+
+export class SuiClientWrapper {
+  private grpc: SuiGrpcClient;
+  private graphql: SuiGraphQLClient;
+  private moduleFilter: string;
+
+  constructor(grpcUrl: string, graphqlUrl: string, packageId: string, network: SuiNetwork = 'testnet') {
+    this.grpc = new SuiGrpcClient({ baseUrl: grpcUrl, network });
+    this.graphql = new SuiGraphQLClient({ url: graphqlUrl, network });
+    this.moduleFilter = `${packageId}::events`;
   }
 
   /**
-   * Queries events from the blockchain.
+   * Queries events from the blockchain via GraphQL (gRPC has no module-filtered,
+   * paginated event query — see sdk.mystenlabs.com/sui/migrations/sui-2.0/json-rpc-migration).
    * Filters events to the core package's events module with retry logic.
    * Requirements: 1.1, 1.3, 1.5, 1.7
    */
   async queryEvents(cursor: string | null, limit: number): Promise<SuiEventPage> {
-    const parsedCursor = cursor ? JSON.parse(cursor) : null;
     let attempt = 0;
     const maxAttempts = 5;
     let delay = 1000;
 
     while (attempt < maxAttempts) {
       try {
-        const response = await this.client.queryEvents({
-          query: {
-            MoveEventModule: { package: this.packageId, module: 'events' },
-          },
-          cursor: parsedCursor,
-          limit,
-          order: 'ascending',
+        const result = await this.graphql.query<QueryModuleEventsResult>({
+          query: QUERY_MODULE_EVENTS,
+          variables: { module: this.moduleFilter, first: limit, after: cursor },
         });
 
-        const events: RawSuiEvent[] = response.data.map((e: SuiEvent) => ({
-          id: { txDigest: e.id.txDigest, eventSeq: e.id.eventSeq },
-          packageId: e.packageId,
-          transactionModule: e.transactionModule,
-          sender: e.sender,
-          type: e.type,
-          parsedJson: e.parsedJson as Record<string, unknown>,
-          timestampMs: e.timestampMs ?? String(Date.now()),
-          checkpoint: (e as Record<string, unknown>).checkpoint as string | undefined,
-        }));
+        if (result.errors?.length) {
+          throw new Error(`GraphQL queryEvents error: ${result.errors.map((e) => e.message).join('; ')}`);
+        }
 
-        const nextCursor = response.nextCursor ? JSON.stringify(response.nextCursor) : null;
+        const connection = result.data?.events;
+        const nodes = connection?.nodes ?? [];
+
+        const events: RawSuiEvent[] = nodes.map((n, i) => ({
+          id: {
+            txDigest: n.transaction?.digest ?? '',
+            eventSeq: String(n.sequenceNumber ?? i),
+          },
+          packageId: n.transactionModule?.package?.address ?? '',
+          transactionModule: n.transactionModule?.name ?? '',
+          sender: n.sender?.address ?? '',
+          type: n.contents?.type?.repr ?? '',
+          parsedJson: n.contents?.json ?? {},
+          timestampMs: n.timestamp ? String(new Date(n.timestamp).getTime()) : String(Date.now()),
+        }));
 
         return {
           events,
-          nextCursor,
-          hasNextPage: response.hasNextPage,
+          nextCursor: connection?.pageInfo?.endCursor ?? null,
+          hasNextPage: connection?.pageInfo?.hasNextPage ?? false,
         };
       } catch (error: unknown) {
         attempt++;
@@ -100,34 +165,31 @@ export class SuiClientWrapper {
     policyType: string,
   ): Promise<Record<string, unknown> | null> {
     try {
-      const pool = await this.client.getObject({ id: poolId, options: { showContent: true } });
-      const poolContent = (pool.data?.content as { fields?: Record<string, unknown> } | undefined)
-        ?.fields;
-      const delegations = (poolContent?.delegations as { fields?: { id?: { id?: string } } } | undefined)
-        ?.fields;
-      const delegationsTableId = delegations?.id?.id;
+      const poolRes = await this.grpc.core.getObject({ objectId: poolId, include: { json: true } });
+      const poolFields = unwrapFields(poolRes.object.json);
+      const delegationsTableId = unwrapId(unwrapFields(poolFields?.delegations)?.id);
       if (!delegationsTableId) return null;
 
-      const dfDelegation = await this.client.getDynamicFieldObject({
+      const addressBytes = pureBcsSchemaFromTypeName('address').serialize(agentAddress).toBytes();
+      const dfDelegation = await this.grpc.core.getDynamicObjectField({
         parentId: delegationsTableId,
-        name: { type: 'address', value: agentAddress },
+        name: { type: 'address', bcs: addressBytes },
+        include: { json: true },
       });
-      const delegationFields = (dfDelegation.data?.content as { fields?: Record<string, unknown> } | undefined)
-        ?.fields;
-      const delValue = (delegationFields?.value as { fields?: Record<string, unknown> } | undefined)
-        ?.fields;
-      const configsBagId = (
-        delValue?.configs as { fields?: { id?: { id?: string } } } | undefined
-      )?.fields?.id?.id;
+      const delegationFields = unwrapFields(dfDelegation.object.json);
+      const delValue = unwrapFields(delegationFields?.value);
+      const configsBagId = unwrapId(unwrapFields(delValue?.configs)?.id);
       if (!configsBagId) return null;
 
-      const dfConfig = await this.client.getDynamicFieldObject({
+      const typeNameBcs = bcs.struct('TypeName', { name: bcs.string() });
+      const typeNameBytes = typeNameBcs.serialize({ name: policyType }).toBytes();
+      const dfConfig = await this.grpc.core.getDynamicObjectField({
         parentId: configsBagId,
-        name: { type: '0x1::type_name::TypeName', value: { name: policyType } },
+        name: { type: '0x1::type_name::TypeName', bcs: typeNameBytes },
+        include: { json: true },
       });
-      const cfgWrap = (dfConfig.data?.content as { fields?: Record<string, unknown> } | undefined)
-        ?.fields;
-      const cfgValue = (cfgWrap?.value as { fields?: Record<string, unknown> } | undefined)?.fields;
+      const cfgWrap = unwrapFields(dfConfig.object.json);
+      const cfgValue = unwrapFields(cfgWrap?.value);
       return cfgValue ?? null;
     } catch (e) {
       console.warn(

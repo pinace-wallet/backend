@@ -5,9 +5,9 @@ Indexer for the Pinace agent-delegation protocol on Sui. Two sub-services on a s
 1. **Indexer** — singleton worker that polls Sui events, processes them atomically, and persists pool balances, agents, policies, actions, audit logs.
 2. **REST API** — stateless Fastify server queried by the wallet extension + Fenik agent POC.
 
-- **Live**: `http://54.80.234.72:3001` (AWS EC2, Docker Compose, behind nginx)
+- **Live**: `https://backend-production-baa0.up.railway.app` (Railway; previously AWS EC2 at `54.80.234.72:3001`, retired when that instance stopped being reachable)
 - **Move package** (testnet): `0x5be5ab02…2a751a23b`
-- **Health**: [`/health`](http://54.80.234.72:3001/health) returns 503 if indexer lag > 60s
+- **Health**: [`/health`](https://backend-production-baa0.up.railway.app/health) returns 503 if indexer lag > 60s
 
 ---
 

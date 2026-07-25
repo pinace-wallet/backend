@@ -34,7 +34,7 @@ async function main() {
   }
 
   // 5. Start Indexer Polling Loop
-  const suiClient = new SuiClientWrapper(config.suiRpcUrl, config.packageId);
+  const suiClient = new SuiClientWrapper(config.suiGrpcUrl, config.suiGraphqlUrl, config.packageId, config.suiNetwork);
   const repo = new IndexerRepository();
   const processor = new EventProcessor(repo, suiClient);
   const pollingLoop = new PollingLoop(

@@ -74,36 +74,10 @@ export class PollingLoop {
     if (!this.active) return;
 
     try {
-      // 1. Get the last checkpoint sequence from the database
+      // 1. Get the last processed checkpoint sequence (synthetic, monotonic — see
+      //    upsertCheckpoint) and the opaque GraphQL cursor to resume queryEvents from.
       const lastSeq = await this.repo.getCheckpoint(this.prisma);
-      let cursor: string | null = null;
-
-      if (lastSeq !== null && lastSeq > 0n) {
-        // The maxSeqInBatch stored in checkpoints is a synthetic monotonic
-        // counter (lastSeq + 1 per batch), not Sui's real checkpoint
-        // sequence — so on restart the saved value rarely matches any
-        // event_logs.checkpointSeq. First try the original lookup, then
-        // fall back to "whatever event we stored most recently" so
-        // queryEvents resumes from the right point instead of restarting
-        // from the beginning of history (which causes the loop to spin
-        // marking every page as already-processed).
-        const exactMatch = await this.prisma.eventLog.findFirst({
-          where: { checkpointSeq: lastSeq },
-          orderBy: { timestamp: 'desc' },
-        });
-        const lastEvent =
-          exactMatch ??
-          (await this.prisma.eventLog.findFirst({
-            orderBy: [{ checkpointSeq: 'desc' }, { timestamp: 'desc' }],
-          }));
-
-        if (lastEvent) {
-          const payload = lastEvent.rawPayload as any;
-          if (payload && payload.id) {
-            cursor = JSON.stringify(payload.id);
-          }
-        }
-      }
+      const cursor = await this.repo.getCursor(this.prisma);
 
       // 2. Query events from Sui
       const page = await this.suiClient.queryEvents(cursor, this.batchSize);
@@ -138,8 +112,8 @@ export class PollingLoop {
               // Process events
               await this.processor.processBatch(page.events, tx, maxSeqInBatch);
 
-              // Update checkpoint sequence
-              await this.repo.upsertCheckpoint(tx, maxSeqInBatch);
+              // Update checkpoint sequence and the GraphQL resume cursor
+              await this.repo.upsertCheckpoint(tx, maxSeqInBatch, page.nextCursor);
             });
 
             processed = true;

@@ -18,7 +18,7 @@ async function main() {
   const prisma = getPrismaClient(config.databaseUrl);
 
   // 4. Initialize components
-  const suiClient = new SuiClientWrapper(config.suiRpcUrl, config.packageId);
+  const suiClient = new SuiClientWrapper(config.suiGrpcUrl, config.suiGraphqlUrl, config.packageId, config.suiNetwork);
   const repo = new IndexerRepository();
   const processor = new EventProcessor(repo, suiClient);
   const pollingLoop = new PollingLoop(

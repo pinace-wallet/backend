@@ -120,6 +120,9 @@ model EventLog {
 model Checkpoint {
   id                Int      @id @default(1)
   lastCheckpointSeq BigInt   @map("last_checkpoint_seq")
+  // Opaque Sui GraphQL events-connection cursor to resume queryEvents() from.
+  // Relay-style cursor, not comparable/parseable — just round-tripped as-is.
+  lastCursor        String?  @map("last_cursor")
   updatedAt         DateTime @map("updated_at") @db.Timestamptz
 
   @@map("checkpoints")

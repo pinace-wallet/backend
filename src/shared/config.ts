@@ -3,7 +3,9 @@ import { z } from 'zod';
 // ─── AppConfig interface ────────────────────────────────────────────────────
 
 export interface AppConfig {
-  suiRpcUrl: string;
+  suiGrpcUrl: string;
+  suiGraphqlUrl: string;
+  suiNetwork: 'mainnet' | 'testnet' | 'devnet' | 'localnet';
   packageId: string;
   databaseUrl: string;
   pollIntervalMs: number; // default 2000, range 1000–60000
@@ -53,9 +55,20 @@ function optionalIntWithRangeDefault(
 // ─── Zod schema ─────────────────────────────────────────────────────────────
 
 const envSchema = z.object({
+  // JSON-RPC is deactivated on Sui mainnet full nodes the week of 2026-07-27 — see
+  // https://sdk.mystenlabs.com/sui/migrations/sui-2.0/json-rpc-migration
+  // SUI_RPC_URL now points at the gRPC endpoint (same host:port as the old fullnode JSON-RPC URL).
   SUI_RPC_URL: z
     .string({ required_error: 'SUI_RPC_URL is required' })
     .url('SUI_RPC_URL must be a valid URL'),
+
+  SUI_GRAPHQL_URL: z
+    .string({ required_error: 'SUI_GRAPHQL_URL is required' })
+    .url('SUI_GRAPHQL_URL must be a valid URL'),
+
+  SUI_NETWORK: z
+    .enum(['mainnet', 'testnet', 'devnet', 'localnet'])
+    .default('testnet'),
 
   PACKAGE_ID: z
     .string({ required_error: 'PACKAGE_ID is required' })
@@ -95,7 +108,9 @@ export function loadConfig(): AppConfig {
   const env = result.data;
 
   return {
-    suiRpcUrl:      env.SUI_RPC_URL,
+    suiGrpcUrl:     env.SUI_RPC_URL,
+    suiGraphqlUrl:  env.SUI_GRAPHQL_URL,
+    suiNetwork:     env.SUI_NETWORK,
     packageId:      env.PACKAGE_ID,
     databaseUrl:    env.DATABASE_URL,
     pollIntervalMs: env.POLL_INTERVAL_MS,
