@@ -9,6 +9,7 @@ describe('AppConfig Validation', () => {
     vi.resetModules();
     process.env = {
       SUI_RPC_URL: 'https://fullnode.testnet.sui.io:443',
+      SUI_GRAPHQL_URL: 'https://sui-testnet.mystenlabs.com/graphql',
       PACKAGE_ID: '0x48fe6e060674e81288375a770fc4ad3022d2ca07ea28fb77b3d8ecfb8c115c04',
       DATABASE_URL: 'postgresql://pinace:secret@localhost:5432/pinace_indexer',
     };
