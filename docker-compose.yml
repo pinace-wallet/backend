@@ -15,7 +15,10 @@ services:
     build: .
     environment:
       SUI_RPC_URL: https://fullnode.testnet.sui.io:443
-      SUI_GRAPHQL_URL: https://sui-testnet.mystenlabs.com/graphql
+      # sui-testnet.mystenlabs.com/graphql (Alpha) was decommissioned in
+      # favor of the Beta endpoint ahead of the JSON-RPC sunset (week of
+      # 2026-07-27) — see https://docs.sui.io/guides/developer/advanced/graphql-migration
+      SUI_GRAPHQL_URL: https://graphql.testnet.sui.io/graphql
       SUI_NETWORK: testnet
       PACKAGE_ID: 0x5be5ab0292590e61e2dc21d11cc7174970f48e5ff54c88d4797c81b2a751a23b
       DATABASE_URL: postgresql://pinace:secret@postgres:5432/pinace_indexer
