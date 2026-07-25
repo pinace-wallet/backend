@@ -589,6 +589,73 @@ export const openapi = {
         }
       }
     },
+    "/owners/{address}/stats": {
+      "get": {
+        "summary": "Aggregate exec stats across every agent the owner controls",
+        "tags": [
+          "Owners"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "address",
+            "required": true,
+            "description": "Owner Sui address (0x-prefixed)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "owner": {
+                      "type": "string"
+                    },
+                    "totalAgents": {
+                      "type": "number"
+                    },
+                    "executingCount": {
+                      "type": "number",
+                      "description": "Distinct agents with at least one proposed-but-unsettled action."
+                    },
+                    "successCount": {
+                      "type": "number"
+                    },
+                    "settledCount": {
+                      "type": "number"
+                    },
+                    "inFlightCount": {
+                      "type": "number"
+                    },
+                    "successRate": {
+                      "type": "number",
+                      "nullable": true,
+                      "description": "successCount / settledCount; null when no settled actions yet."
+                    }
+                  },
+                  "required": [
+                    "owner",
+                    "totalAgents",
+                    "executingCount",
+                    "successCount",
+                    "settledCount",
+                    "inFlightCount",
+                    "successRate"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/agents/{agentId}/timeline": {
       "get": {
         "summary": "Get an agent's event timeline with milestones and summary stats",
@@ -1341,6 +1408,45 @@ export const openapi = {
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/stream": {
+      "get": {
+        "summary": "Live SSE feed of indexed Pinace events (pool / agent / policy / action).",
+        "tags": [
+          "Events"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "owner",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "poolId",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "agentAddress",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
           }
         }
       }
